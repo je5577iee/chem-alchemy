@@ -64,4 +64,4 @@
 
 ## 授權
 
-程式碼採用 [MIT License](LICENSE)。所有圖示皆為原創，未使用任何外部圖片、字型或素材。
+程式碼採用 [MIT License](LICENSE)。
