@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>化學煉金術</title>
+<title>化學反應實驗室</title>
 <!--
-  化學煉金術：把物質放進燒杯、選條件，發現新的物質
+  化學反應實驗室：把物質放進燒杯、選條件，發現新的物質
   - 單一 HTML 檔，完全離線可用，不引用任何外部資源
   - 所有反應都是國中、高中課本常見的真實反應，方程式已配平
   - 進度只存在本機瀏覽器，不蒐集任何個人資料
@@ -126,12 +126,24 @@ header{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom
 .toast{position:fixed; left:50%; top:16px; transform:translateX(-50%); background:linear-gradient(90deg, #2a9e88, #6a4fc9); color:#fff; padding:10px 18px; border-radius:12px; font-weight:900; z-index:60; box-shadow:0 6px 20px rgba(0,0,0,.4); animation:drop .3s; max-width:92vw; text-align:center}
 @keyframes drop{from{transform:translate(-50%,-20px); opacity:0}}
 #jump{position:fixed; left:50%; bottom:14px; transform:translateX(-50%); z-index:40; background:linear-gradient(90deg, var(--cyan), #8af5a5); color:#10132a; font-weight:900; padding:10px 18px; border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.45); white-space:nowrap; max-width:92vw; overflow:hidden; text-overflow:ellipsis}
+.left-col{display:grid; gap:14px; align-content:start; min-width:0}
+.side-row{display:grid; grid-template-columns:minmax(0,1fr); gap:14px}
+.nm-t{font-weight:900; font-size:18px}
+.nm-d{color:var(--soft); font-size:14px; margin:4px 0 8px}
+.nm-h{font-size:14px; color:var(--cyan); font-weight:700; line-height:1.6}
+.nm-btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+.log{display:grid; gap:6px; max-height:260px; overflow:auto}
+.log .row{background:rgba(0,0,0,.2); border-radius:9px; padding:7px 10px; font-weight:800; font-size:14px; line-height:1.4}
+.log .row small{color:var(--soft); font-weight:700; margin-left:4px}
+.log .row.newest{box-shadow:inset 3px 0 0 var(--cyan)}
+.log .none{color:var(--soft); font-size:14px}
 .safety{font-size:12.5px; color:var(--soft); text-align:center; margin-top:14px}
 
 @media (min-width:880px){
   .lab{grid-template-columns:minmax(0,1fr) 400px; align-items:start}
   .bench{position:sticky; top:12px; order:2}
-  .inv{order:1}
+  .left-col{order:1}
+  .side-row{grid-template-columns:1fr 1fr}
 }
 @media (max-width:420px){
   .slot{width:92px; height:92px}
@@ -147,7 +159,7 @@ header{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom
   <header>
     <div class="logo">
       <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M18 4h12M20 4v14L8 40a3 3 0 0 0 3 4h26a3 3 0 0 0 3-4L28 18V4" fill="none" stroke="#5ef2d6" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><path d="M13 32h22l4 8a2 2 0 0 1-2 3H11a2 2 0 0 1-2-3z" fill="#ff7ab6" opacity=".85"/><circle cx="20" cy="26" r="2" fill="#5ef2d6"/><circle cx="27" cy="22" r="1.5" fill="#5ef2d6"/></svg>
-      <h1>化學煉金術</h1>
+      <h1>化學反應實驗室</h1>
     </div>
     <span class="prog" id="prog"></span>
     <nav class="tabs">
@@ -178,9 +190,15 @@ header{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom
         <button class="go" id="goBtn">開始反應！</button>
         <div class="result" id="result"><span class="meh">選好物質和條件，按「開始反應」看看會發生什麼事。</span></div>
       </div>
-      <div class="panel inv">
-        <div class="inv-head"><h2 style="margin:0">我的物質</h2><div class="filters" id="filters"></div></div>
-        <div class="grid" id="inv"></div>
+      <div class="left-col">
+        <div class="panel inv">
+          <div class="inv-head"><h2 style="margin:0">我的物質</h2><div class="filters" id="filters"></div></div>
+          <div class="grid" id="inv"></div>
+        </div>
+        <div class="side-row">
+          <div class="panel"><h2>下一個任務</h2><div id="nextMis"></div></div>
+          <div class="panel"><h2 id="logTitle">實驗紀錄</h2><div class="log" id="log"></div></div>
+        </div>
       </div>
     </div>
     <p class="safety">⚠️ 遊戲中的反應僅供學習，很多真實操作有毒或會爆炸，請勿自行嘗試。</p>
@@ -503,11 +521,32 @@ function toast(msg){
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t);
   clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.remove(); }, 2600);
 }
+/* 左邊：下一個任務、實驗紀錄 */
+function renderSide(){
+  const i = MISSIONS.findIndex(function(m, j){ return store.mis.indexOf(j) < 0; });
+  if(i < 0){
+    $('nextMis').innerHTML = '<div class="nm-t">🎉 全部任務都完成了！</div><div class="nm-d">試試看把圖鑑收集完整吧。</div>';
+  }else{
+    const m = MISSIONS[i], h = store.hints[i] || 0;
+    $('nextMis').innerHTML = '<div class="nm-t">'+m.t+'</div><div class="nm-d">'+m.d+'</div>'
+      + m.h.slice(0, h).map(function(x, j){ return '<div class="nm-h">提示 '+(j+1)+'：'+x+'</div>'; }).join('')
+      + '<div class="nm-btns">'+(h < m.h.length ? '<button class="icon-btn" id="nmHint">'+(h ? '再給一個提示' : '給我提示')+'</button>' : '')
+      + '<button class="icon-btn" id="nmAll">看全部任務（'+store.mis.length+' / '+MISSIONS.length+'）</button></div>';
+    if($('nmHint')) $('nmHint').onclick = function(){ store.hints[i] = h + 1; save(); renderSide(); };
+  }
+  $('nmAll') && ($('nmAll').onclick = function(){ document.querySelector('.tab[data-v="mis"]').click(); });
+  const done = store.done.slice().reverse();
+  $('logTitle').textContent = '實驗紀錄（'+store.done.length+' / '+R.length+'）';
+  $('log').innerHTML = done.length ? done.map(function(id, j){
+    const r = R.filter(function(x){ return x.id===id; })[0];
+    return '<div class="row'+(j===0?' newest':'')+'">'+r.eq+'<small>'+CONDS.filter(function(c){ return c.k===r.c; })[0].e+'</small></div>';
+  }).join('') : '<div class="none">還沒有做過實驗。選一兩種物質、挑一個條件，按「開始反應！」試試看！</div>';
+}
 function checkMissions(){
   MISSIONS.forEach(function(m, i){
     if(store.mis.indexOf(i) < 0 && misDone(m)){ store.mis.push(i); save(); toast('任務完成：'+m.t); }
   });
-  renderProg();
+  renderProg(); renderSide();
   if($('v-mis').classList.contains('on')) renderMissions();
 }
 function renderMissions(){
@@ -520,7 +559,7 @@ function renderMissions(){
       + (!done ? m.h.slice(0, h).map(function(x, j){ return '<div class="h">提示 '+(j+1)+'：'+x+'</div>'; }).join('') + (h < m.h.length ? '<button class="hb" data-i="'+i+'">'+(h ? '再給一個提示' : '給我提示')+'</button>' : '') : '')
       + '</div>';
   }).join('');
-  document.querySelectorAll('.hb').forEach(function(b){ b.onclick = function(){ const i = +b.dataset.i; store.hints[i] = (store.hints[i]||0) + 1; save(); renderMissions(); }; });
+  document.querySelectorAll('.hb').forEach(function(b){ b.onclick = function(){ const i = +b.dataset.i; store.hints[i] = (store.hints[i]||0) + 1; save(); renderMissions(); renderSide(); }; });
 }
 
 /* ===== 圖鑑 ===== */
@@ -581,7 +620,7 @@ function updateJump(){
   if(show) $('jump').innerHTML = '燒杯：'+slots.filter(Boolean).map(function(k){ return S[k].f; }).join(' ＋ ')+'　↑ 去反應';
 }
 $('jump').onclick = function(){ document.querySelector('.bench').scrollIntoView({ behavior:'smooth', block:'start' }); };
-function renderAll(){ renderProg(); renderFilters(); renderInv(); renderSlots(); renderConds(); renderSound(); }
+function renderAll(){ renderProg(); renderFilters(); renderInv(); renderSlots(); renderConds(); renderSound(); renderSide(); }
 renderAll(); checkMissions();
 </script>
 </body>
